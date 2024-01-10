@@ -44,66 +44,71 @@ You can embed Shiny inputs and outputs in your document. Outputs are automatical
 library(shiny)
 library(shinyjs)
 
-
-#Connecting to a database
+# Connecting to a database
 mydb <- dbConnect(RSQLite::SQLite(), "roche_products")
+generateColumn <- function(year) {
+  column(textOutput(outputId = paste0("resultDisplay", year)), width = 3)
+}
 
-
-
-ui<-fluidPage(
+ui <- fluidPage(
   titlePanel("Roche Pipeline"),
   sidebarLayout(
     sidebarPanel(),
-    
     mainPanel(
       fluidRow(
-        column(textOutput(outputId = "resultDisplay2020"),width=3),
-        column(textOutput(outputId = "resultDisplay2021"),width=3),
-        column(textOutput(outputId = "resultDisplay2022"),width=3),
-        column(textOutput(outputId = "resultDisplay2023"),width=3))
+        generateColumn(2020),
+        generateColumn(2021),
+        generateColumn(2022),
+        generateColumn(2023)
+      )
     )
-    )
-    
+  )
 )
-  
 
-
-# Define server function that does nothing
+# Define server function
 server <- function(input, output, session) {
- 
-      # Query the 'roche_products' table and fetch the count where "Filing date" is 2020
-
-        # Update the result display
-#create a function that takes in a year and returns the count of rows with that year
-
-queryResult<-function(year){
+  
+  # Query the 'roche_products' table and fetch the count where "Filing date" is the specified year
+  queryResult <- function(year) {
     outputName <- paste0("resultDisplay", year)
     
     output[[outputName]] <- renderText({
       as.character(dbGetQuery(mydb, paste('SELECT COUNT(*) FROM roche_products WHERE "Filing date" =', year)))
     })
   }
- 
 
-
-queryResult(2020)
-queryResult(2021)
-queryResult(2022)
-queryResult(2023)
-
+  # Function to alternate between the year and the result every 30 seconds
+  updateText <- function(year) {
+    timer <- reactiveTimer(30000)
+    
+    observe({
+      timer()
+      current_time <- as.numeric(session$currentTime())
+      if (current_time %% 60000 <= 30000) {
+        output[[paste0("resultDisplay", year)]] <- renderText({
+          as.character(year)
+        })
+      } else {
+        queryResult(year)
+      }
+    })
+  }
+  
+  # Call the updateText function for each year
+  updateText(2020)
+  updateText(2021)
+  updateText(2022)
+  updateText(2023)
   
   # Close the database connection when the Shiny app stops
   session$onSessionEnded(function() {
-    dbDisconnect(mydb)})
-
-
+    dbDisconnect(mydb)
+  })
 }
-
-
-
 
 # Create the app object
 shinyApp(ui = ui, server = server)
+
 ```
 
 ## Embedded Application
