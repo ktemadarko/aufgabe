@@ -1,0 +1,182 @@
+---
+title: "Orientation"
+author: "Ama Owusu-Darko"
+date: "`r Sys.Date()`"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r dbi}
+library(DBI)
+library(tidyverse)
+library(tidylog)
+
+```
+
+```{r drops}
+#Wrangling Roche data from online
+Roche_Pipeline <- read_delim("C:/Users/Korantema/Downloads/Roche_Pipeline_2024-01-09 (1).csv",delim = ";", escape_double = FALSE, trim_ws = TRUE)
+
+Roche_Pipeline<-Roche_Pipeline|>
+  filter(!is.na(`Trade name`)&!is.na(`Filing date`)&`Filing date`!='2025+')
+```
+
+```{r db}
+#Load R dataframe into the database
+DBI::dbWriteTable(mydb,"roche_products", Roche_Pipeline)
+DBI::dbListTables(mydb)
+
+DBI::dbDisconnect(mydb)
+
+```
+
+To learn more, see [Interactive Documents](http://rmarkdown.rstudio.com/authoring_shiny.html).
+
+## Inputs and Outputs
+
+You can embed Shiny inputs and outputs in your document. Outputs are automatically updated whenever inputs change.  This demonstrates how a standard R plot can be made interactive by wrapping it in the Shiny `renderPlot` function. The `selectInput` and `sliderInput` functions create the input widgets used to drive the plot.
+
+```{r ui, echo=FALSE}
+library(shiny)
+library(shinyjs)
+
+
+#Connecting to a database
+mydb <- dbConnect(RSQLite::SQLite(), "roche_products")
+
+
+
+ui<-fluidPage(
+  titlePanel("Roche Pipeline"),
+  sidebarLayout(
+    sidebarPanel(),
+    
+    mainPanel(
+      fluidRow(
+        column(textOutput(outputId = "resultDisplay2020"),width=3),
+        column(textOutput(outputId = "resultDisplay2021"),width=3),
+        column(textOutput(outputId = "resultDisplay2022"),width=3),
+        column(textOutput(outputId = "resultDisplay2023"),width=3))
+    )
+    )
+    
+)
+  
+
+
+# Define server function that does nothing
+server <- function(input, output, session) {
+ 
+      # Query the 'roche_products' table and fetch the count where "Filing date" is 2020
+
+        # Update the result display
+#create a function that takes in a year and returns the count of rows with that year
+
+queryResult<-function(year){
+  outputName<-paste0("resultDisplay",year)
+
+  output[[outputName]] <- renderText({
+    as.character(dbGetQuery(mydb, paste0('SELECT COUNT(*) FROM roche_products WHERE "Filing date" = ',year)))
+    
+  })
+  
+}
+
+queryResult(2020)
+queryResult(2021)
+queryResult(2022)
+queryResult(2023)
+  
+  # Close the database connection when the Shiny app stops
+  session$onSessionEnded(function() {
+    dbDisconnect(mydb)})
+
+
+}
+
+
+
+
+# Create the app object
+shinyApp(ui = ui, server = server)
+```
+
+## Embedded Application
+
+It's also possible to embed an entire Shiny application within an R Markdown document using the `shinyAppDir` function. This example embeds a Shiny application located in another directory:
+
+```{r tabsets, echo=FALSE}
+#shinyAppDir(
+ # system.file("examples/06_tabsets", package = "shiny"),
+ # options = list(
+ #   width = "100%", height = 550
+ # )
+#)
+```
+
+Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
+
+You can also use the `shinyApp` function to define an application inline rather then in an external directory.
+
+In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
+
+
+```{r}
+library(shiny)
+library(DBI)
+library(shinyjs)  
+#Connecting to a database
+mydb <- dbConnect(RSQLite::SQLite(), "roche_products")
+ui <- fluidPage(
+  useShinyjs(),  # Initialize shinyjs
+
+  titlePanel("Database Query Result"),
+  mainPanel(
+    textOutput("resultDisplay"),
+    actionButton("unhideButton", "Unhide Result")  # Button to unhide the result
+  )
+)
+
+server <- function(input, output, session) {
+  observeEvent(invalidateLater(45000, session), {
+    wordIndex <- isolate(as.numeric(input$wordIndex))
+
+    # Change the word every 45 seconds
+    wordIndex <- if (wordIndex == 1) 2 else 1
+
+    # Update the word index in the hidden input
+    updateTextInput(session, "wordIndex", value = as.character(wordIndex))
+
+    # Query the database and update the result display
+    result <- if (wordIndex == 1) {
+      "2020"
+    } else {
+      # Query the 'roche_products' table and fetch the count where "Filing date" is 2020
+      query_result <- dbGetQuery(con, 'SELECT COUNT(*) FROM roche_products WHERE "Filing date" = 2020')
+      paste("Count of rows with 'Filing date' equal to 2020: ", query_result$`COUNT(*)`)
+    }
+
+    # Update the result display
+    output$resultDisplay <- renderText(result)
+  })
+
+  # Unhide the result when the "Unhide" button is clicked
+  observeEvent(input$unhideButton, {
+    shinyjs::toggle("resultDisplay")
+  })
+
+
+  # Close the database connection when the Shiny app stops
+  session$onSessionEnded(function() {
+    dbDisconnect(mydb)
+  })
+}
+
+shinyApp(ui, server)
+
+```
+
