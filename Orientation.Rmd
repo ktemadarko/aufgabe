@@ -77,19 +77,20 @@ server <- function(input, output, session) {
 #create a function that takes in a year and returns the count of rows with that year
 
 queryResult<-function(year){
-  outputName<-paste0("resultDisplay",year)
-
-  output[[outputName]] <- renderText({
-    as.character(dbGetQuery(mydb, paste0('SELECT COUNT(*) FROM roche_products WHERE "Filing date" = ',year)))
+    outputName <- paste0("resultDisplay", year)
     
-  })
-  
-}
+    output[[outputName]] <- renderText({
+      as.character(dbGetQuery(mydb, paste('SELECT COUNT(*) FROM roche_products WHERE "Filing date" =', year)))
+    })
+  }
+ 
+
 
 queryResult(2020)
 queryResult(2021)
 queryResult(2022)
 queryResult(2023)
+
   
   # Close the database connection when the Shiny app stops
   session$onSessionEnded(function() {
