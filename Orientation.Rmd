@@ -78,22 +78,6 @@ server <- function(input, output, session) {
     })
   }
 
-  # Function to alternate between the year and the result every 30 seconds
-  updateText <- function(year) {
-    timer <- reactiveTimer(30000)
-    
-    observe({
-      timer()
-      current_time <- as.numeric(session$currentTime())
-      if (current_time %% 60000 <= 30000) {
-        output[[paste0("resultDisplay", year)]] <- renderText({
-          as.character(year)
-        })
-      } else {
-        queryResult(year)
-      }
-    })
-  }
   
   # Call the updateText function for each year
   updateText(2020)
